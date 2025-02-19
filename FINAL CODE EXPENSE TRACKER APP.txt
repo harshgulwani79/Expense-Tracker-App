@@ -1,0 +1,490 @@
+import tkinter as tk
+from tkinter import ttk, messagebox
+from tkcalendar import Calendar, DateEntry
+import datetime
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+
+class ExpenseTrackerApp(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title("Money Tracker")
+        self.geometry("400x600")
+        self.configure(bg="black")
+
+        # Initialize variables to keep track of total income and expenses
+        self.income_total = 0.0
+        self.expense_total = 0.0
+        self.transactions = {}
+
+        # Set up the tab control for "Daily", "Calendar", and "Graph" views
+        self.style = ttk.Style()
+        self.style.configure("Black.TFrame", background="black")
+
+        self.tab_control = ttk.Notebook(self)
+
+        # Create and add the tabs for Daily, Calendar, and Graph
+        self.daily_tab = ttk.Frame(self.tab_control, style="Black.TFrame")
+        self.calendar_tab = ttk.Frame(self.tab_control, style="Black.TFrame")
+        self.graph_tab = ttk.Frame(self.tab_control, style="Black.TFrame")
+
+        self.tab_control.add(self.daily_tab, text="Home")
+        self.tab_control.add(self.calendar_tab, text="Calendar")
+        self.tab_control.add(self.graph_tab, text="Graph")
+        
+        self.tab_control.pack(expand=1, fill="both")
+        
+        # Display labels for income, expense, and total in the Daily tab
+        self.income_label = tk.Label(self.daily_tab, text="Income: 0.00", fg="cyan", font=("Arial", 14), bg="black")
+        self.expense_label = tk.Label(self.daily_tab, text="Expense: 0.00", fg="red", font=("Arial", 14), bg="black")
+        self.total_label = tk.Label(self.daily_tab, text="Net: 0.00", font=("Arial", 14), bg="black", fg="white")
+
+        self.income_label.pack(pady=10)
+        self.expense_label.pack(pady=10)
+        self.total_label.pack(pady=10)
+
+        # Button to add new transactions
+        self.add_transaction_button = tk.Button(self.daily_tab, text="+", font=("Arial", 20), command=self.open_transaction_window, bg="red", fg="white", height=1, width=3)
+        self.add_transaction_button.pack(pady=20)
+        close_button = tk.Button(self.daily_tab, text="Close", command=self.destroy, bg="red", fg="white").pack(pady = 20)
+        # Set up the Calendar tab for the monthly expense view
+        self.create_calendar_view()
+
+        # Set up the Graph tab for the annual summary view
+        self.create_graph_view()
+
+    def create_calendar_view(self):
+        self.calendar = Calendar(self.calendar_tab, selectmode='day', date_pattern='dd/mm/yy')
+        self.calendar.pack(pady=20)
+        self.calendar.bind("<<CalendarSelected>>", self.open_transaction_summary)
+
+    def create_graph_view(self):
+        # Year Label and Dropdown Menu
+        year_label = tk.Label(self.graph_tab, text="Year:", bg="black", fg="white", font=("Arial", 12))
+        year_label.pack(pady=5)
+        
+        self.year_combo = ttk.Combobox(self.graph_tab, values=[str(year) for year in range(2000, datetime.datetime.now().year + 1)])
+        self.year_combo.pack(pady=5)
+        
+        # Show Summary Button
+        show_summary_button = tk.Button(self.graph_tab, text="Show Summary", command=self.show_annual_summary, bg="red", fg="white")
+        show_summary_button.pack(pady=20)
+
+    # Opens a new window to add a transaction
+    def open_transaction_window(self):
+        self.transaction_window = tk.Toplevel(self)
+        self.transaction_window.title("Add Transaction")
+        self.transaction_window.geometry("400x300")
+        self.transaction_window.configure(bg="black")
+
+        # Use tabs to differentiate between Income and Expense entries
+        transaction_tabs = ttk.Notebook(self.transaction_window)
+        
+        income_tab = ttk.Frame(transaction_tabs, style="Black.TFrame")
+        expense_tab = ttk.Frame(transaction_tabs, style="Black.TFrame")
+        
+        transaction_tabs.add(income_tab, text="Income")
+        transaction_tabs.add(expense_tab, text="Expense")
+        
+        transaction_tabs.pack(expand=1, fill="both")
+        
+        # Set up the input fields for each tab
+        self.create_transaction_tab(income_tab, "Income", ["Allowance", "Salary", "Petty Cash", "Bonus", "Other"])
+        self.create_transaction_tab(expense_tab, "Expense", ["Food", "Social Life", "Pets", "Transport", "Culture", "Household", 
+                                                             "Apparel", "Beauty", "Health", "Education", "Gift", "Other"])
+
+    # Helper function to create input fields for adding a transaction
+    def create_transaction_tab(self, tab, transaction_type, categories):
+        row = 0
+
+        # Input for date with calendar dropdown
+        date_label = tk.Label(tab, text="Date:", bg="black", fg="white")
+        date_label.grid(row=row, column=0, sticky="w", padx=10, pady=5)
+        date_entry = DateEntry(tab, date_pattern='dd/mm/yy', background="black", foreground="white")
+        date_entry.grid(row=row, column=1, sticky="w", padx=10, pady=5)
+        row += 1
+        # Input for amount
+        amount_label = tk.Label(tab, text="Amount (Rupees):", bg="black", fg="white")
+        amount_label.grid(row=row, column=0, sticky="w", padx=10, pady=5)
+        amount_entry = tk.Entry(tab)
+        amount_entry.grid(row=row, column=1, sticky="w", padx=10, pady=5)
+
+        row += 1
+        # Dropdown for category
+        category_label = tk.Label(tab, text="Category:", bg="black", fg="white")
+        category_label.grid(row=row, column=0, sticky="w", padx=10, pady=5)
+        category_combo = ttk.Combobox(tab, values=categories)
+        category_combo.grid(row=row, column=1, sticky="w", padx=10, pady=5)
+
+        row += 1
+        # Note entry
+        note_label = tk.Label(tab, text="Note:", bg="black", fg="white")
+        note_label.grid(row=row, column=0, sticky="w", padx=10, pady=5)
+        note_entry = tk.Entry(tab)
+        note_entry.grid(row=row, column=1, sticky="w", padx=10, pady=5)
+
+        row += 1
+        # Save button
+        save_button = tk.Button(tab, text="Save", bg="red", fg="white", command=lambda: self.save_transaction(transaction_type, date_entry.get(), amount_entry.get(), category_combo.get(), note_entry.get()))
+        save_button.grid(row=row, column=1, sticky="e", padx=10, pady=10)
+        close_button = tk.Button(tab, text="Close", command=self.transaction_window.destroy, bg="red", fg="white").grid(row=row, column=3, sticky="e", padx=10, pady=10)
+
+    def show_annual_summary(self):
+        selected_year = self.year_combo.get()
+        if not selected_year:
+            messagebox.showerror("Error", "Please select a year")
+            return
+
+        # Initialize monthly income and expense data to zero
+        income_data = [0] * 12
+        expense_data = [0] * 12
+
+        # Aggregate data from transactions
+        for date, entry_types in self.transactions.items():
+            transaction_date = datetime.datetime.strptime(date, '%d/%m/%y')
+            if transaction_date.year == int(selected_year):
+                month_index = transaction_date.month - 1
+                for entry_type, entries in entry_types.items():
+                    for entry in entries:
+                        if entry_type == "Income":
+                            income_data[month_index] += entry["amount"]
+                        elif entry_type == "Expense":
+                            expense_data[month_index] += entry["amount"]
+
+        net_data = [income - expense for income, expense in zip(income_data, expense_data)]
+        months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+        annual_summary_window = tk.Toplevel(self)
+        annual_summary_window.title("Annual Summary")
+        annual_summary_window.geometry("700x900")
+        annual_summary_window.configure(bg="black")
+
+        tk.Label(annual_summary_window, text=f"Year: {selected_year}", font=("Arial", 14), bg="black", fg="white").pack(pady=10)
+
+        # Create a single figure with Income and Expense as line plots and Net as a bar plot
+        fig, ax = plt.subplots(figsize=(8, 8), dpi=80)
+        fig.patch.set_facecolor("black")
+
+        # Line plots for Income and Expense
+        ax.plot(months, income_data, color="blue", marker="o", label="Income")
+        ax.plot(months, expense_data, color="red", marker="o", label="Expense")
+
+        # Bar plot for Net
+        ax.bar(months, net_data, color="green", alpha=0.6, label="Net")
+
+        # Set labels, title, legend, and colors
+        ax.set_title("Annual Financial Summary", color="white", fontsize=16)
+        ax.set_xlabel("Months", color="white")
+        ax.set_ylabel("Amount (Rupees)", color="white")
+        ax.tick_params(axis="x", colors="white")
+        ax.tick_params(axis="y", colors="white")
+        ax.legend(facecolor="black", edgecolor="white", labelcolor="white")
+
+        # Embed the chart in the Tkinter window
+        canvas = FigureCanvasTkAgg(fig, master=annual_summary_window)
+        canvas.draw()
+        canvas.get_tk_widget().pack()
+
+        # Close button
+        close_button = tk.Button(annual_summary_window, text="Close", command=annual_summary_window.destroy, bg="red", fg="white")
+        close_button.pack(pady=10)
+    def open_transaction_summary(self, event):
+        selected_date = self.calendar.get_date()
+        transaction_summary_window = tk.Toplevel(self)
+        transaction_summary_window.title(f"Transactions on {selected_date}")
+        transaction_summary_window.geometry("300x300")
+        transaction_summary_window.configure(bg="black")
+
+        if selected_date in self.transactions:
+            income_transactions = self.transactions[selected_date].get("Income", [])
+            expense_transactions = self.transactions[selected_date].get("Expense", [])
+
+            tk.Label(transaction_summary_window, text="Income", fg="blue", bg="black", font=("Arial", 12, "bold")).pack(pady=5)
+            for transaction in income_transactions:
+                tk.Label(transaction_summary_window, text=f"{transaction['category']}: {transaction['amount']} (Note: {transaction['note']})", bg="black", fg="white").pack(anchor="w", padx=10)
+
+            tk.Label(transaction_summary_window, text="Expense", fg="red", bg="black", font=("Arial", 12, "bold")).pack(pady=5)
+            for transaction in expense_transactions:
+                tk.Label(transaction_summary_window, text=f"{transaction['category']}: {transaction['amount']} (Note: {transaction['note']})", bg="black", fg="white").pack(anchor="w", padx=10)
+        else:
+            tk.Label(transaction_summary_window, text="No transactions for this date.", bg="black", fg="white").pack(pady=10)
+
+    def save_transaction(self, transaction_type, date, amount, category, note):
+        try:
+            amount = float(amount)
+        except ValueError:
+            messagebox.showerror("Error", "Invalid amount")
+            return
+
+        # Save transaction data
+        if date not in self.transactions:
+            self.transactions[date] = {"Income": [], "Expense": []}
+        
+        self.transactions[date][transaction_type].append({"amount": amount, "category": category, "note": note})
+
+        # Update totals
+        if transaction_type == "Income":
+            self.income_total += amount
+        elif transaction_type == "Expense":
+            self.expense_total += amount
+        
+        self.update_totals()
+        messagebox.showinfo("Saved", f"{transaction_type} saved successfully!")
+        
+        # Close the transaction window after saving
+        self.transaction_window.destroy()
+
+    def update_totals(self):
+        self.income_label.config(text=f"Income: {self.income_total:.2f}")
+        self.expense_label.config(text=f"Expense: {self.expense_total:.2f}")
+        total = self.income_total - self.expense_total
+        self.total_label.config(text=f"Net: {total:.2f}")
+
+# Run the application
+app = ExpenseTrackerApp()
+app.mainloop()
+import tkinter as tk
+from tkinter import ttk, messagebox
+from tkcalendar import Calendar, DateEntry
+import datetime
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+
+class ExpenseTrackerApp(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title("Money Tracker")
+        self.geometry("400x600")
+        self.configure(bg="black")
+
+        # Initialize variables to keep track of total income and expenses
+        self.income_total = 0.0
+        self.expense_total = 0.0
+        self.transactions = {}
+
+        # Set up the tab control for "Daily", "Calendar", and "Graph" views
+        self.style = ttk.Style()
+        self.style.configure("Black.TFrame", background="black")
+
+        self.tab_control = ttk.Notebook(self)
+
+        # Create and add the tabs for Daily, Calendar, and Graph
+        self.daily_tab = ttk.Frame(self.tab_control, style="Black.TFrame")
+        self.calendar_tab = ttk.Frame(self.tab_control, style="Black.TFrame")
+        self.graph_tab = ttk.Frame(self.tab_control, style="Black.TFrame")
+
+        self.tab_control.add(self.daily_tab, text="Home")
+        self.tab_control.add(self.calendar_tab, text="Calendar")
+        self.tab_control.add(self.graph_tab, text="Graph")
+        
+        self.tab_control.pack(expand=1, fill="both")
+        
+        # Display labels for income, expense, and total in the Daily tab
+        self.income_label = tk.Label(self.daily_tab, text="Income: 0.00", fg="cyan", font=("Arial", 14), bg="black")
+        self.expense_label = tk.Label(self.daily_tab, text="Expense: 0.00", fg="red", font=("Arial", 14), bg="black")
+        self.total_label = tk.Label(self.daily_tab, text="Net: 0.00", font=("Arial", 14), bg="black", fg="white")
+
+        self.income_label.pack(pady=10)
+        self.expense_label.pack(pady=10)
+        self.total_label.pack(pady=10)
+
+        # Button to add new transactions
+        self.add_transaction_button = tk.Button(self.daily_tab, text="+", font=("Arial", 20), command=self.open_transaction_window, bg="red", fg="white", height=1, width=3)
+        self.add_transaction_button.pack(pady=20)
+        close_button = tk.Button(self.daily_tab, text="Close", command=self.destroy, bg="red", fg="white").pack(pady = 20)
+        # Set up the Calendar tab for the monthly expense view
+        self.create_calendar_view()
+
+        # Set up the Graph tab for the annual summary view
+        self.create_graph_view()
+
+    def create_calendar_view(self):
+        self.calendar = Calendar(self.calendar_tab, selectmode='day', date_pattern='dd/mm/yy')
+        self.calendar.pack(pady=20)
+        self.calendar.bind("<<CalendarSelected>>", self.open_transaction_summary)
+
+    def create_graph_view(self):
+        # Year Label and Dropdown Menu
+        year_label = tk.Label(self.graph_tab, text="Year:", bg="black", fg="white", font=("Arial", 12))
+        year_label.pack(pady=5)
+        
+        self.year_combo = ttk.Combobox(self.graph_tab, values=[str(year) for year in range(2000, datetime.datetime.now().year + 1)])
+        self.year_combo.pack(pady=5)
+        
+        # Show Summary Button
+        show_summary_button = tk.Button(self.graph_tab, text="Show Summary", command=self.show_annual_summary, bg="red", fg="white")
+        show_summary_button.pack(pady=20)
+
+    # Opens a new window to add a transaction
+    def open_transaction_window(self):
+        self.transaction_window = tk.Toplevel(self)
+        self.transaction_window.title("Add Transaction")
+        self.transaction_window.geometry("400x300")
+        self.transaction_window.configure(bg="black")
+
+        # Use tabs to differentiate between Income and Expense entries
+        transaction_tabs = ttk.Notebook(self.transaction_window)
+        
+        income_tab = ttk.Frame(transaction_tabs, style="Black.TFrame")
+        expense_tab = ttk.Frame(transaction_tabs, style="Black.TFrame")
+        
+        transaction_tabs.add(income_tab, text="Income")
+        transaction_tabs.add(expense_tab, text="Expense")
+        
+        transaction_tabs.pack(expand=1, fill="both")
+        
+        # Set up the input fields for each tab
+        self.create_transaction_tab(income_tab, "Income", ["Allowance", "Salary", "Petty Cash", "Bonus", "Other"])
+        self.create_transaction_tab(expense_tab, "Expense", ["Food", "Social Life", "Pets", "Transport", "Culture", "Household", 
+                                                             "Apparel", "Beauty", "Health", "Education", "Gift", "Other"])
+
+    # Helper function to create input fields for adding a transaction
+    def create_transaction_tab(self, tab, transaction_type, categories):
+        row = 0
+
+        # Input for date with calendar dropdown
+        date_label = tk.Label(tab, text="Date:", bg="black", fg="white")
+        date_label.grid(row=row, column=0, sticky="w", padx=10, pady=5)
+        date_entry = DateEntry(tab, date_pattern='dd/mm/yy', background="black", foreground="white")
+        date_entry.grid(row=row, column=1, sticky="w", padx=10, pady=5)
+        row += 1
+        # Input for amount
+        amount_label = tk.Label(tab, text="Amount (Rupees):", bg="black", fg="white")
+        amount_label.grid(row=row, column=0, sticky="w", padx=10, pady=5)
+        amount_entry = tk.Entry(tab)
+        amount_entry.grid(row=row, column=1, sticky="w", padx=10, pady=5)
+
+        row += 1
+        # Dropdown for category
+        category_label = tk.Label(tab, text="Category:", bg="black", fg="white")
+        category_label.grid(row=row, column=0, sticky="w", padx=10, pady=5)
+        category_combo = ttk.Combobox(tab, values=categories)
+        category_combo.grid(row=row, column=1, sticky="w", padx=10, pady=5)
+
+        row += 1
+        # Note entry
+        note_label = tk.Label(tab, text="Note:", bg="black", fg="white")
+        note_label.grid(row=row, column=0, sticky="w", padx=10, pady=5)
+        note_entry = tk.Entry(tab)
+        note_entry.grid(row=row, column=1, sticky="w", padx=10, pady=5)
+
+        row += 1
+        # Save button
+        save_button = tk.Button(tab, text="Save", bg="red", fg="white", command=lambda: self.save_transaction(transaction_type, date_entry.get(), amount_entry.get(), category_combo.get(), note_entry.get()))
+        save_button.grid(row=row, column=1, sticky="e", padx=10, pady=10)
+        close_button = tk.Button(tab, text="Close", command=self.transaction_window.destroy, bg="red", fg="white").grid(row=row, column=3, sticky="e", padx=10, pady=10)
+
+    def show_annual_summary(self):
+        selected_year = self.year_combo.get()
+        if not selected_year:
+            messagebox.showerror("Error", "Please select a year")
+            return
+
+        # Initialize monthly income and expense data to zero
+        income_data = [0] * 12
+        expense_data = [0] * 12
+
+        # Aggregate data from transactions
+        for date, entry_types in self.transactions.items():
+            transaction_date = datetime.datetime.strptime(date, '%d/%m/%y')
+            if transaction_date.year == int(selected_year):
+                month_index = transaction_date.month - 1
+                for entry_type, entries in entry_types.items():
+                    for entry in entries:
+                        if entry_type == "Income":
+                            income_data[month_index] += entry["amount"]
+                        elif entry_type == "Expense":
+                            expense_data[month_index] += entry["amount"]
+
+        net_data = [income - expense for income, expense in zip(income_data, expense_data)]
+        months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+        annual_summary_window = tk.Toplevel(self)
+        annual_summary_window.title("Annual Summary")
+        annual_summary_window.geometry("700x900")
+        annual_summary_window.configure(bg="black")
+
+        tk.Label(annual_summary_window, text=f"Year: {selected_year}", font=("Arial", 14), bg="black", fg="white").pack(pady=10)
+
+        # Create a single figure with Income and Expense as line plots and Net as a bar plot
+        fig, ax = plt.subplots(figsize=(8, 8), dpi=80)
+        fig.patch.set_facecolor("black")
+
+        # Line plots for Income and Expense
+        ax.plot(months, income_data, color="blue", marker="o", label="Income")
+        ax.plot(months, expense_data, color="red", marker="o", label="Expense")
+
+        # Bar plot for Net
+        ax.bar(months, net_data, color="green", alpha=0.6, label="Net")
+
+        # Set labels, title, legend, and colors
+        ax.set_title("Annual Financial Summary", color="white", fontsize=16)
+        ax.set_xlabel("Months", color="white")
+        ax.set_ylabel("Amount (Rupees)", color="white")
+        ax.tick_params(axis="x", colors="white")
+        ax.tick_params(axis="y", colors="white")
+        ax.legend(facecolor="black", edgecolor="white", labelcolor="white")
+
+        # Embed the chart in the Tkinter window
+        canvas = FigureCanvasTkAgg(fig, master=annual_summary_window)
+        canvas.draw()
+        canvas.get_tk_widget().pack()
+
+        # Close button
+        close_button = tk.Button(annual_summary_window, text="Close", command=annual_summary_window.destroy, bg="red", fg="white")
+        close_button.pack(pady=10)
+    def open_transaction_summary(self, event):
+        selected_date = self.calendar.get_date()
+        transaction_summary_window = tk.Toplevel(self)
+        transaction_summary_window.title(f"Transactions on {selected_date}")
+        transaction_summary_window.geometry("300x300")
+        transaction_summary_window.configure(bg="black")
+
+        if selected_date in self.transactions:
+            income_transactions = self.transactions[selected_date].get("Income", [])
+            expense_transactions = self.transactions[selected_date].get("Expense", [])
+
+            tk.Label(transaction_summary_window, text="Income", fg="blue", bg="black", font=("Arial", 12, "bold")).pack(pady=5)
+            for transaction in income_transactions:
+                tk.Label(transaction_summary_window, text=f"{transaction['category']}: {transaction['amount']} (Note: {transaction['note']})", bg="black", fg="white").pack(anchor="w", padx=10)
+
+            tk.Label(transaction_summary_window, text="Expense", fg="red", bg="black", font=("Arial", 12, "bold")).pack(pady=5)
+            for transaction in expense_transactions:
+                tk.Label(transaction_summary_window, text=f"{transaction['category']}: {transaction['amount']} (Note: {transaction['note']})", bg="black", fg="white").pack(anchor="w", padx=10)
+        else:
+            tk.Label(transaction_summary_window, text="No transactions for this date.", bg="black", fg="white").pack(pady=10)
+
+    def save_transaction(self, transaction_type, date, amount, category, note):
+        try:
+            amount = float(amount)
+        except ValueError:
+            messagebox.showerror("Error", "Invalid amount")
+            return
+
+        # Save transaction data
+        if date not in self.transactions:
+            self.transactions[date] = {"Income": [], "Expense": []}
+        
+        self.transactions[date][transaction_type].append({"amount": amount, "category": category, "note": note})
+
+        # Update totals
+        if transaction_type == "Income":
+            self.income_total += amount
+        elif transaction_type == "Expense":
+            self.expense_total += amount
+        
+        self.update_totals()
+        messagebox.showinfo("Saved", f"{transaction_type} saved successfully!")
+        
+        # Close the transaction window after saving
+        self.transaction_window.destroy()
+
+    def update_totals(self):
+        self.income_label.config(text=f"Income: {self.income_total:.2f}")
+        self.expense_label.config(text=f"Expense: {self.expense_total:.2f}")
+        total = self.income_total - self.expense_total
+        self.total_label.config(text=f"Net: {total:.2f}")
+
+# Run the application
+app = ExpenseTrackerApp()
+app.mainloop()
